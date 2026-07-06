@@ -77,6 +77,50 @@ A single-page application with view-based navigation (no router yet) covering:
 
 ---
 
+## Project Structure
+
+```
+MedStock-GST-Pharmacy-Billing-Inventory-Suite/
+├── docker-compose.yml
+├── backend/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── alembic.ini
+│   ├── .env.example
+│   ├── alembic/
+│   │   ├── env.py
+│   │   └── versions/
+│   │       └── c4ed273e458a_create_initial_tables.py
+│   └── app/
+│       ├── main.py            # FastAPI app entrypoint, router registration, health check
+│       ├── config.py          # Settings (DATABASE_URL, SECRET_KEY, STORE_STATE_CODE, etc.)
+│       ├── db.py               # SQLAlchemy engine/session setup
+│       ├── auth.py             # JWT creation/verification, RoleChecker dependency
+│       ├── models.py           # SQLAlchemy ORM models (all 10 tables)
+│       ├── schemas.py          # Pydantic request/response schemas
+│       └── routers/
+│           ├── auth.py         # /auth/login, /auth/me, default user seeding
+│           ├── medicines.py    # Medicine CRUD
+│           ├── suppliers.py    # Supplier CRUD
+│           ├── batches.py      # Batch CRUD + /batches/available (FEFO-sorted)
+│           ├── customers.py    # Customer CRUD
+│           ├── purchases.py    # Purchase recording (creates batches)
+│           ├── sales.py        # Billing engine + PDF invoice generation
+│           └── analytics.py    # /analytics/alerts, /analytics/sales-summary
+└── frontend/
+    ├── package.json
+    ├── vite.config.js
+    ├── index.html
+    ├── public/
+    └── src/
+        ├── main.jsx
+        ├── App.jsx              # Single-page app: dashboard, billing, inventory, customers, suppliers views
+        ├── App.css / index.css
+        └── assets/
+```
+
+---
+
 ## Database Schema
 
 | Table           | Purpose                                                       |
