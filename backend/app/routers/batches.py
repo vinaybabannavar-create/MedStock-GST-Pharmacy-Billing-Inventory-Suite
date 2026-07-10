@@ -74,15 +74,57 @@ def create_batch(
 @router.put("/{batch_id}", response_model=schemas.BatchResponse)
 def update_batch(
     batch_id: int,
-    batch: schemas.BatchCreate,
+    batch_data: schemas.BatchUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_admin_or_pharmacist)
 ):
+    """Update batch metadata only. To change stock quantity, use POST /batches/{batch_id}/adjust."""
     db_batch = db.query(models.Batch).filter(models.Batch.id == batch_id).first()
     if not db_batch:
         raise HTTPException(status_code=404, detail="Batch not found")
-    for key, value in batch.model_dump().items():
+    for key, value in batch_data.model_dump().items():
         setattr(db_batch, key, value)
     db.commit()
     db.refresh(db_batch)
     return db_batch
+
+
+@router.post("/{batch_id}/adjust", response_model=schemas.BatchResponse)
+def adjust_batch_quantity(
+    batch_id: int,
+    adjustment: schemas.BatchAdjust,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin_or_pharmacist)
+):
+    """
+    Apply a signed quantity change to a batch (positive = add stock, negative = remove).
+    Always writes a stock_ledger audit entry.
+    Reasons accepted: 'adjustment' or 'expiry_removal'.
+    """
+    db_batch = db.query(models.Batch).filter(models.Batch.id == batch_id).first()
+    if not db_batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    new_quantity = db_batch.quantity + adjustment.change_qty
+    if new_quantity < 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Adjustment would result in negative quantity "
+                   f"({db_batch.quantity} + {adjustment.change_qty} = {new_quantity}). "
+                   f"Current stock: {db_batch.quantity}"
+        )
+
+    db_batch.quantity = new_quantity
+
+    # Record in audit ledger
+    ledger_entry = models.StockLedger(
+        batch_id=batch_id,
+        change_qty=adjustment.change_qty,
+        reason=adjustment.reason,
+        reference_id=None  # Manual adjustment — no linked sale or purchase
+    )
+    db.add(ledger_entry)
+    db.commit()
+    db.refresh(db_batch)
+    return db_batch
+

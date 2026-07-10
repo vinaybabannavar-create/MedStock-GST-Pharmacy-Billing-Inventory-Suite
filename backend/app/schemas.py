@@ -136,6 +136,23 @@ class BatchBase(BaseModel):
 class BatchCreate(BatchBase):
     pass
 
+class BatchUpdate(BaseModel):
+    batch_no: str = Field(..., min_length=1)
+    expiry_date: date
+    purchase_price: Decimal = Field(..., gt=0)
+    mrp: Decimal = Field(..., gt=0)
+
+class BatchAdjust(BaseModel):
+    change_qty: int
+    reason: str
+
+    @field_validator('reason')
+    @classmethod
+    def validate_reason(cls, value: str) -> str:
+        if value not in ["adjustment", "expiry_removal"]:
+            raise ValueError("Reason must be either 'adjustment' or 'expiry_removal'")
+        return value
+
 class BatchResponse(BatchBase):
     id: int
     created_at: datetime
