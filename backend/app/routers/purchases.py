@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app import auth, models, schemas
@@ -58,7 +59,8 @@ def create_purchase(
                     )
                 
                 # Update batch fields
-                batch.quantity += item.quantity
+                received_qty = item.quantity + item.free_quantity
+                batch.quantity += received_qty
                 batch.purchase_price = item.purchase_price
                 if item.mrp is not None:
                     batch.mrp = item.mrp
@@ -87,9 +89,10 @@ def create_purchase(
                     models.Batch.supplier_id == purchase_data.supplier_id
                 ).first()
 
+                received_qty = item.quantity + item.free_quantity
                 if existing_batch:
                     # Update existing batch
-                    existing_batch.quantity += item.quantity
+                    existing_batch.quantity += received_qty
                     existing_batch.purchase_price = item.purchase_price
                     existing_batch.mrp = item.mrp
                     target_batch = existing_batch
@@ -99,7 +102,7 @@ def create_purchase(
                         medicine_id=item.medicine_id,
                         batch_no=item.batch_no,
                         expiry_date=item.expiry_date,
-                        quantity=item.quantity,
+                        quantity=received_qty,
                         purchase_price=item.purchase_price,
                         mrp=item.mrp,
                         supplier_id=purchase_data.supplier_id
@@ -113,21 +116,24 @@ def create_purchase(
                 purchase_id=db_purchase.id,
                 batch_id=target_batch.id,
                 quantity=item.quantity,
-                purchase_price=item.purchase_price
+                free_quantity=item.free_quantity,
+                purchase_price=item.purchase_price,
+                discount_percent=item.discount_percent
             )
             db.add(db_item)
 
             # Insert stock ledger row for audit trail
             db_ledger = models.StockLedger(
                 batch_id=target_batch.id,
-                change_qty=item.quantity,
+                change_qty=received_qty,
                 reason="purchase",
                 reference_id=db_purchase.id
             )
             db.add(db_ledger)
 
-            # Sum total
-            total_amount += Decimal(str(item.quantity)) * item.purchase_price
+            # Sum total applying discount_percent (line_total = qty * price * (1 - disc/100))
+            line_total = Decimal(str(item.quantity)) * item.purchase_price * (Decimal("1.00") - item.discount_percent / Decimal("100.00"))
+            total_amount += line_total
 
         # Update total amount on the purchase record
         db_purchase.total_amount = total_amount
@@ -144,3 +150,38 @@ def create_purchase(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to record purchase transaction: {str(e)}"
         )
+
+
+@router.get("/", response_model=List[schemas.PurchaseResponse])
+def list_purchases(
+    supplier_id: Optional[int] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.RoleChecker(["admin", "pharmacist", "cashier"]))
+):
+    """List purchase transactions with filtering and pagination"""
+    query = db.query(models.Purchase)
+    if supplier_id is not None:
+        query = query.filter(models.Purchase.supplier_id == supplier_id)
+    if start_date is not None:
+        query = query.filter(models.Purchase.date >= start_date)
+    if end_date is not None:
+        query = query.filter(models.Purchase.date <= end_date)
+    
+    return query.order_by(models.Purchase.date.desc(), models.Purchase.id.desc()).offset(skip).limit(limit).all()
+
+
+@router.get("/{purchase_id}", response_model=schemas.PurchaseResponse)
+def get_purchase(
+    purchase_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.RoleChecker(["admin", "pharmacist", "cashier"]))
+):
+    """Retrieve a single purchase by ID"""
+    purchase = db.query(models.Purchase).filter(models.Purchase.id == purchase_id).first()
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Purchase not found")
+    return purchase

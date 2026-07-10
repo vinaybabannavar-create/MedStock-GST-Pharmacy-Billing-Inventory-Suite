@@ -65,11 +65,23 @@ def create_batch(
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
 
-    db_batch = models.Batch(**batch.model_dump())
-    db.add(db_batch)
-    db.commit()
-    db.refresh(db_batch)
-    return db_batch
+    try:
+        db_batch = models.Batch(**batch.model_dump())
+        db.add(db_batch)
+        db.commit()
+        db.refresh(db_batch)
+        return db_batch
+    except Exception as e:
+        db.rollback()
+        if "unique constraint" in str(e).lower() or "uq_batches" in str(e).lower() or "duplicate key" in str(e).lower():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Batch number '{batch.batch_no}' already exists for this medicine and supplier"
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create batch: {str(e)}"
+        )
 
 @router.put("/{batch_id}", response_model=schemas.BatchResponse)
 def update_batch(

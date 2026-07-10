@@ -173,14 +173,18 @@ class PurchaseItemCreate(BaseModel):
     expiry_date: Optional[date] = None
     mrp: Optional[Decimal] = None
     quantity: int = Field(..., gt=0)
+    free_quantity: int = Field(0, ge=0)
     purchase_price: Decimal = Field(..., gt=0)
+    discount_percent: Decimal = Field(Decimal("0.00"), ge=0, le=100)
 
 class PurchaseItemResponse(BaseModel):
     id: int
     purchase_id: int
     batch_id: int
     quantity: int
+    free_quantity: int
     purchase_price: Decimal
+    discount_percent: Decimal
 
     model_config = ConfigDict(from_attributes=True)
 

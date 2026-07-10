@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.db import check_db_connection, SessionLocal
 from app.config import settings
-from app.routers import auth, medicines, suppliers, batches, customers, purchases, sales, analytics
+from app.routers import auth, medicines, suppliers, batches, customers, purchases, sales, analytics, stock_ledger
 from app.routers.auth import seed_initial_users
 
 @asynccontextmanager
@@ -23,10 +23,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS — allow all origins for local dev
+# CORS configuration
+allowed_origins_list = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,6 +42,7 @@ app.include_router(customers.router,  prefix="/customers",  tags=["Customers"])
 app.include_router(purchases.router,  prefix="/purchases",  tags=["Purchases"])
 app.include_router(sales.router,      prefix="/sales",      tags=["Sales"])
 app.include_router(analytics.router,  prefix="/analytics",  tags=["Analytics"])
+app.include_router(stock_ledger.router, prefix="/stock-ledger", tags=["Stock Ledger"])
 
 # ─── Core endpoints ──────────────────────────────────────────
 @app.get("/", tags=["Root"])

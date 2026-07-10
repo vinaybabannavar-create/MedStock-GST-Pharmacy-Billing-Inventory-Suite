@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Numeric, ForeignKey, ForeignKeyConstraint, text
+from sqlalchemy import Column, Integer, String, Date, DateTime, Numeric, ForeignKey, ForeignKeyConstraint, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db import Base
@@ -51,6 +51,9 @@ class Medicine(Base):
 
 class Batch(Base):
     __tablename__ = "batches"
+    __table_args__ = (
+        UniqueConstraint('medicine_id', 'batch_no', 'supplier_id', name='uq_batches_medicine_batch_supplier'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     medicine_id = Column(Integer, ForeignKey("medicines.id", ondelete="CASCADE"), nullable=False)
@@ -106,7 +109,9 @@ class PurchaseItem(Base):
     purchase_id = Column(Integer, ForeignKey("purchases.id", ondelete="CASCADE"), nullable=False)
     batch_id = Column(Integer, ForeignKey("batches.id", ondelete="RESTRICT"), nullable=False)
     quantity = Column(Integer, nullable=False)
+    free_quantity = Column(Integer, server_default="0", default=0, nullable=False)
     purchase_price = Column(Numeric(10, 2), nullable=False)
+    discount_percent = Column(Numeric(5, 2), server_default="0.00", default=0.00, nullable=False)
 
     # Relationships
     purchase = relationship("Purchase", back_populates="items")

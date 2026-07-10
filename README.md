@@ -2,30 +2,28 @@
 
 A GST-compliant billing, inventory, and stock-ledger system built for a single medical store in Karnataka, India. MediLedger handles day-to-day pharmacy operations — medicine and batch management, supplier purchases, point-of-sale billing with automatic CGST/SGST/IGST calculation, PDF invoice generation, and real-time stock/expiry alerts — with every stock movement recorded in an immutable audit trail.
 
-This is an active, in-progress build. The sections below describe exactly what is implemented today, not a roadmap.
-
 ---
 
 ## Tech Stack
 
-| Layer          | Technology                                         |
-|----------------|-----------------------------------------------------|
-| Backend        | FastAPI (Python), SQLAlchemy ORM, Alembic migrations |
-| Database       | PostgreSQL 16                                       |
-| Auth           | JWT (OAuth2 password flow), role-based access control |
-| PDF Invoices   | ReportLab                                           |
-| Frontend       | React 19 (Vite), Tailwind CSS v4, lucide-react icons |
-| HTTP Client    | Axios                                               |
-| Containerization | Docker Compose (PostgreSQL + FastAPI backend)     |
+| Layer            | Technology                                           |
+|------------------|------------------------------------------------------|
+| Backend          | FastAPI (Python), SQLAlchemy ORM, Alembic migrations |
+| Database         | PostgreSQL 16                                        |
+| Auth             | JWT (OAuth2 password flow), role-based access control |
+| PDF Invoices     | ReportLab                                            |
+| Frontend         | React 19 (Vite), Tailwind CSS v4, lucide-react icons |
+| HTTP Client      | Axios                                                |
+| Containerization | Docker Compose (PostgreSQL + FastAPI + React/Vite)   |
 
 ---
 
-## Features Implemented So Far
+## Features
 
 ### Authentication & Roles
 - JWT-based login (`/auth/login`) using OAuth2 password flow
 - Three roles: `admin`, `pharmacist`, `cashier`, enforced per-endpoint via a `RoleChecker` dependency
-- Default accounts are auto-seeded on first startup (admin, pharmacist, cashier) for immediate local testing
+- Default accounts are auto-seeded on first startup for immediate local testing
 
 ### Master Data Management (Full CRUD)
 - **Medicines** — name, generic name, manufacturer, HSN code, GST rate, unit, category
@@ -35,45 +33,42 @@ This is an active, in-progress build. The sections below describe exactly what i
 
 ### Purchases
 - Recording supplier purchases creates purchase records, purchase line items, and corresponding batches in a single transaction
+- Supports **free quantity** per line item — free stock is added to physical batch quantity but does not contribute to the cost total
+- Supports **line-level discount percent** — applied to the paid quantity total per item
+- `GET /purchases` — paginated list filterable by `supplier_id`, `start_date`, `end_date`
+- `GET /purchases/{id}` — full purchase detail including all line items
 
 ### Billing Engine (`POST /sales`)
-The core of the system. On every sale:
-- Validates each requested batch has sufficient stock and has not expired — rejected at the API level, not just in the UI
-- Computes GST per line item based on the store's registered state (Karnataka, state code `29`, set via `STORE_STATE_CODE` config):
-  - Customer in Karnataka (or no customer specified — assumes local walk-in) → **CGST + SGST** (split evenly)
+- Validates each batch has sufficient stock and has not expired — rejected at the API level
+- Computes GST per line item based on the store's registered state (Karnataka, state code `29`):
+  - Customer in Karnataka (or walk-in) → **CGST + SGST** (split evenly)
   - Customer outside Karnataka → **IGST** (full rate)
-- Deducts stock directly from the selected batch and writes a corresponding entry to `stock_ledger` for full audit traceability (reason: `sale`, linked to the invoice)
-- Auto-generates a unique invoice number in the format `MED-YYYY-NNNNNN`
-- Applies discounts and computes the grand total
-- All operations run inside a single database transaction — a failure partway through rolls back cleanly, so stock and invoice numbers never go out of sync
-
-A `GET /batches/available` endpoint returns only in-stock, non-expired batches sorted by expiry date ascending, for use as a FEFO (first-expiry-first-out) reference list when the frontend selects which batch to bill from.
+- Deducts stock from the selected batch and writes a `stock_ledger` entry (reason: `sale`)
+- Auto-generates unique invoice numbers in the format `MED-YYYY-NNNNNN`
+- All operations run in a single database transaction — partial failures roll back cleanly
 
 ### PDF Invoices
-- `GET /sales/{id}/pdf` generates a branded, GST-compliant invoice PDF on the fly using ReportLab, including itemized medicine/batch/expiry details, CGST/SGST or IGST breakdown, discount, grand total, and terms & conditions
+- `GET /sales/{id}/pdf` — generates a branded, GST-compliant invoice PDF using ReportLab with itemized CGST/SGST or IGST breakdown
 
 ### Alerts & Analytics
-- `GET /analytics/alerts` — a single endpoint returning:
-  - Batches already expired but still carrying stock
-  - Batches expiring within 7 days (critical)
-  - Batches expiring within 8–30 days (upcoming)
-  - Batches at or below 10 units (low stock)
+- `GET /analytics/alerts` — expired batches with stock, near-expiry (7 days / 30 days), and low-stock (≤10 units)
 - `GET /analytics/sales-summary` — invoice count and revenue totals for today, this month, and all-time
 
-### Frontend (React + Tailwind)
-A single-page application with view-based navigation (no router yet) covering:
-- **Dashboard** — at-a-glance store overview
-- **Billing** — cart-based sale entry with live GST calculation and customer state handling
+### Batch & Stock Management
+- `PUT /batches/{id}` — updates **metadata only** (batch_no, expiry_date, purchase_price, mrp) — quantity is never overwritten directly
+- `POST /batches/{id}/adjust` — adjusts batch stock by a signed integer with a mandatory reason (`adjustment` or `expiry_removal`); always writes to `stock_ledger`; rejects adjustments that would cause negative stock
+- DB-level unique constraint on `(medicine_id, batch_no, supplier_id)` prevents duplicate batch entries
+- `GET /stock-ledger` — paginated audit trail of all stock changes, filterable by `batch_id`, `reason`, `start_date`, `end_date`
+
+### Frontend (React + Vite)
+Modular single-page application split into dedicated page components:
+- **LoginPage** — clean login screen with no hardcoded credential hints
+- **Dashboard** — at-a-glance alerts and revenue counters
+- **Billing** — cart-based sale entry with live GST calculation
 - **Inventory** — medicine and batch management
 - **Customers** — customer records
 - **Suppliers** — supplier records
-- Token-based session persisted in local storage, with authenticated API requests via Axios
-
-### Infrastructure
-- `docker-compose.yml` currently orchestrates:
-  - `db` — PostgreSQL 16 with a health check gate
-  - `backend` — FastAPI app with hot-reload, waiting on the database health check before starting
-- Alembic is configured for schema migrations
+- API base URL driven by `VITE_API_BASE_URL` environment variable (see `frontend/.env.example`)
 
 ---
 
@@ -81,19 +76,21 @@ A single-page application with view-based navigation (no router yet) covering:
 
 ```
 MedStock-GST-Pharmacy-Billing-Inventory-Suite/
-├── docker-compose.yml
+├── docker-compose.yml          # Orchestrates db + backend + frontend
+├── README.md
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── alembic.ini
+│   ├── .env                    # Local secrets (not committed)
 │   ├── .env.example
+│   ├── scripts/
+│   │   └── backup.sh           # pg_dump backup with 30-day retention
 │   ├── alembic/
-│   │   ├── env.py
-│   │   └── versions/
-│   │       └── c4ed273e458a_create_initial_tables.py
+│   │   └── versions/           # All Alembic migration files
 │   └── app/
-│       ├── main.py            # FastAPI app entrypoint, router registration, health check
-│       ├── config.py          # Settings (DATABASE_URL, SECRET_KEY, STORE_STATE_CODE, etc.)
+│       ├── main.py             # FastAPI app, router registration, CORS
+│       ├── config.py           # Settings (DATABASE_URL, SECRET_KEY, ALLOWED_ORIGINS, etc.)
 │       ├── db.py               # SQLAlchemy engine/session setup
 │       ├── auth.py             # JWT creation/verification, RoleChecker dependency
 │       ├── models.py           # SQLAlchemy ORM models (all 10 tables)
@@ -102,85 +99,151 @@ MedStock-GST-Pharmacy-Billing-Inventory-Suite/
 │           ├── auth.py         # /auth/login, /auth/me, default user seeding
 │           ├── medicines.py    # Medicine CRUD
 │           ├── suppliers.py    # Supplier CRUD
-│           ├── batches.py      # Batch CRUD + /batches/available (FEFO-sorted)
+│           ├── batches.py      # Batch CRUD + /adjust endpoint + /available (FEFO)
 │           ├── customers.py    # Customer CRUD
-│           ├── purchases.py    # Purchase recording (creates batches)
+│           ├── purchases.py    # Purchase recording + GET list/detail
 │           ├── sales.py        # Billing engine + PDF invoice generation
-│           └── analytics.py    # /analytics/alerts, /analytics/sales-summary
+│           ├── analytics.py    # /analytics/alerts, /analytics/sales-summary
+│           └── stock_ledger.py # GET /stock-ledger (audit trail)
 └── frontend/
     ├── package.json
     ├── vite.config.js
+    ├── .env.example            # Documents VITE_API_BASE_URL
     ├── index.html
-    ├── public/
     └── src/
         ├── main.jsx
-        ├── App.jsx              # Single-page app: dashboard, billing, inventory, customers, suppliers views
+        ├── App.jsx             # Root component, navigation, shared state
+        ├── api.js              # Axios instance with auth header helper
         ├── App.css / index.css
-        └── assets/
+        └── pages/
+            ├── LoginPage.jsx
+            ├── Dashboard.jsx
+            ├── Billing.jsx
+            ├── Inventory.jsx
+            ├── Suppliers.jsx
+            └── Customers.jsx
 ```
 
 ---
 
 ## Database Schema
 
-| Table           | Purpose                                                       |
-|-----------------|----------------------------------------------------------------|
-| `users`         | Login accounts and roles                                       |
-| `suppliers`     | Supplier master data with GSTIN and state code                 |
-| `medicines`     | Medicine catalog with HSN code and GST rate                    |
-| `batches`       | Stock batches per medicine — quantity, expiry, pricing          |
-| `customers`     | Customer master data, optional state code for GST logic         |
-| `purchases` / `purchase_items` | Supplier purchase records and their line items          |
-| `sales` / `sale_items`         | Billing records with CGST/SGST/IGST breakdown, and their line items |
-| `stock_ledger`  | Immutable audit trail of every stock change (sale, purchase, adjustment, expiry write-off) |
+| Table                            | Purpose                                                              |
+|----------------------------------|----------------------------------------------------------------------|
+| `users`                          | Login accounts and roles                                             |
+| `suppliers`                      | Supplier master data with GSTIN and state code                       |
+| `medicines`                      | Medicine catalog with HSN code and GST rate                          |
+| `batches`                        | Stock batches per medicine — quantity, expiry, pricing               |
+| `customers`                      | Customer master data, optional state code for GST logic              |
+| `purchases` / `purchase_items`   | Supplier purchase records and their line items (with free_qty & discount) |
+| `sales` / `sale_items`           | Billing records with CGST/SGST/IGST breakdown and their line items   |
+| `stock_ledger`                   | Immutable audit trail of every stock change (sale, purchase, adjustment, expiry write-off) |
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
-- Docker Desktop (with virtualization enabled in BIOS/UEFI)
-- Node.js (for running the frontend dev server)
+- **Docker Desktop** (with virtualization enabled)
+- **Node.js 20+** (for running the frontend dev server locally)
 
-### Backend + Database
+### Option A — Full Docker Compose Stack
+
 ```bash
 git clone https://github.com/vinaybabannavar-create/MedStock-GST-Pharmacy-Billing-Inventory-Suite.git
 cd MedStock-GST-Pharmacy-Billing-Inventory-Suite
 ```
-Create a `.env` file inside `backend/` with:
-```
+
+Create `backend/.env`:
+```env
 DATABASE_URL=postgresql+psycopg://postgres:mediledgerpass@db:5432/mediledger
-SECRET_KEY=your-secret-key-here
+SECRET_KEY=your-secret-key-change-this
+ALLOWED_ORIGINS=http://localhost:5173
 ```
-Then start the database and API:
+
+Then start everything:
 ```bash
 docker compose up --build
 ```
-The API will be available at `http://localhost:8000`, with interactive docs at `http://localhost:8000/docs`.
 
-Default seeded accounts (for local testing only — change before real use):
+| Service  | URL                          |
+|----------|------------------------------|
+| Frontend | http://localhost:5173        |
+| Backend  | http://localhost:8000        |
+| API Docs | http://localhost:8000/docs   |
+
+### Option B — Local Development (without Docker)
+
+**Backend:**
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate       # Windows
+pip install -r requirements.txt
+# Set DATABASE_URL in backend/.env pointing to your local Postgres
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
+
+**Frontend:**
+```bash
+cd frontend
+cp .env.example .env        # Edit VITE_API_BASE_URL if needed
+npm install
+npm run dev
+```
+
+### Default Seeded Accounts
+
+> ⚠️ Change these before any real use.
+
 | Username     | Password    | Role        |
 |--------------|-------------|-------------|
 | admin        | admin123    | admin       |
 | pharmacist   | pharma123   | pharmacist  |
 | cashier      | cashier123  | cashier     |
 
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+| Variable         | Default                    | Description                                      |
+|------------------|----------------------------|--------------------------------------------------|
+| `DATABASE_URL`   | —                          | PostgreSQL connection string (required)           |
+| `SECRET_KEY`     | —                          | JWT signing secret (required)                    |
+| `ALLOWED_ORIGINS`| `http://localhost:5173`    | Comma-separated list of allowed CORS origins      |
+| `STORE_STATE_CODE`| `29`                      | Karnataka state code for GST logic               |
+
+### Frontend (`frontend/.env`)
+
+| Variable           | Default                  | Description              |
+|--------------------|--------------------------|--------------------------|
+| `VITE_API_BASE_URL`| `http://localhost:8000`  | Backend API base URL     |
 
 ---
 
-## Known Limitations (Current State)
+## Automated Backups
 
-- FEFO batch selection is currently advisory (`/batches/available` sorts by expiry ascending) rather than enforced automatically by the sale endpoint — the caller specifies the `batch_id` per line item.
-- Invoice numbering uses a plain `MED-YYYY-NNNNNN` sequence rather than the Indian financial-year format (`INV/2026-27/00001`).
-- `docker-compose.yml` does not yet include the frontend as a containerized service — it currently runs via `npm run dev` outside Docker.
-- No automated backup script yet for PostgreSQL.
-- No GSTR-style tax summary report yet (only `/analytics/sales-summary` and `/analytics/alerts` exist today).
+`backend/scripts/backup.sh` runs `pg_dump` against the running PostgreSQL container, compresses the output with `gzip`, and deletes backups older than 30 days.
+
+### Scheduling Daily Backups via Cron
+
+1. Make the script executable:
+   ```bash
+   chmod +x backend/scripts/backup.sh
+   ```
+2. Open your system crontab:
+   ```bash
+   crontab -e
+   ```
+3. Add this entry to run daily at 02:00 AM (adjust the path):
+   ```cron
+   0 2 * * * /path/to/project/backend/scripts/backup.sh >> /var/log/mediledger_backup.log 2>&1
+   ```
+
+Backups are saved to `backend/backups/` as `mediledger_backup_YYYYMMDD_HHMMSS.sql.gz`.
 
 ---
 
