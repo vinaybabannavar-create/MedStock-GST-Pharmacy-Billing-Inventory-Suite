@@ -16,7 +16,9 @@ import {
   ShoppingCart,
   Receipt,
   Printer,
-  X
+  X,
+  RotateCcw,
+  Trash2
 } from 'lucide-react';
 
 // Import refactored page components
@@ -74,10 +76,93 @@ export default function App() {
   });
 
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+  const [confirmModal, setConfirmModal] = useState({ show: false, type: null });
 
   const triggerNotification = (message, type = 'success') => {
     setNotification({ show: true, message, type });
     setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 3000);
+  };
+
+  // Restore Software: reset all UI state to defaults and refresh data from backend
+  const handleRestoreSoftware = () => {
+    setConfirmModal({ show: false, type: null });
+    // Reset active tab to dashboard
+    setActiveTab('dashboard');
+    // Reset billing states
+    setSelectedCustomerId('');
+    setWalkInName('Walk-in Customer');
+    setWalkInPhone('9999999999');
+    setWalkInStateCode('29');
+    setMedSearchQuery('');
+    setCart([]);
+    setDiscount('0.00');
+    setPaymentMode('Cash');
+    setFinalInvoice(null);
+    // Reset create forms
+    setNewMedicine({ name: '', generic_name: '', manufacturer: '', hsn_code: '', gst_rate: '18.00', unit: 'Strip', category: 'Tablet' });
+    setNewSupplier({ name: '', gstin: '', phone: '', address: '', state_code: '29' });
+    setNewCustomer({ name: '', phone: '', address: '', state_code: '29' });
+    setNewBatch({ medicine_id: '', batch_no: '', expiry_date: '', quantity: 100, purchase_price: '50.00', mrp: '99.00', supplier_id: '' });
+    // Re-fetch fresh data from backend
+    fetchData();
+    triggerNotification('Software restored to default state!');
+  };
+
+  // Clear History: wipe all transactional UI state across all pages
+  const handleClearHistory = () => {
+    setConfirmModal({ show: false, type: null });
+    // Clear billing cart and invoice history
+    setCart([]);
+    setFinalInvoice(null);
+    setDiscount('0.00');
+    setPaymentMode('Cash');
+    setMedSearchQuery('');
+    setSelectedCustomerId('');
+    setWalkInName('Walk-in Customer');
+    setWalkInPhone('9999999999');
+    setWalkInStateCode('29');
+    // Clear all form drafts
+    setNewMedicine({ name: '', generic_name: '', manufacturer: '', hsn_code: '', gst_rate: '18.00', unit: 'Strip', category: 'Tablet' });
+    setNewSupplier({ name: '', gstin: '', phone: '', address: '', state_code: '29' });
+    setNewCustomer({ name: '', phone: '', address: '', state_code: '29' });
+    setNewBatch({ medicine_id: '', batch_no: '', expiry_date: '', quantity: 100, purchase_price: '50.00', mrp: '99.00', supplier_id: '' });
+    // Clear any locally stored session tokens and browsing state
+    localStorage.removeItem('activeTab');
+    // Refresh summary data
+    setSales([]);
+    setAlerts(null);
+    setSalesSummary(null);
+    // Re-fetch fresh analytics
+    fetchData();
+    triggerNotification('All history cleared successfully!');
+  };
+
+  // Quick-add customer directly from billing screen
+  const handleQuickAddCustomer = async (custData) => {
+    try {
+      const res = await api.post(`/customers/`, custData, getAuthHeaders(token));
+      await fetchData(); // refresh customers list
+      // Auto-select newly created customer
+      setSelectedCustomerId(String(res.data.id));
+      triggerNotification(`Customer "${res.data.name}" added and selected!`);
+      return true;
+    } catch (err) {
+      triggerNotification(err.response?.data?.detail || 'Failed to add customer', 'error');
+      return false;
+    }
+  };
+
+  // Quick-add medicine directly from billing screen
+  const handleQuickAddMedicine = async (medData) => {
+    try {
+      await api.post(`/medicines/`, medData, getAuthHeaders(token));
+      await fetchData(); // refresh medicines list
+      triggerNotification(`Medicine "${medData.name}" added to catalog!`);
+      return true;
+    } catch (err) {
+      triggerNotification(err.response?.data?.detail || 'Failed to add medicine', 'error');
+      return false;
+    }
   };
 
   useEffect(() => {
@@ -384,6 +469,49 @@ export default function App() {
         </div>
       )}
 
+      {/* Confirmation Modal */}
+      {confirmModal.show && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              confirmModal.type === 'restore' ? 'bg-blue-100' : 'bg-rose-100'
+            }`}>
+              {confirmModal.type === 'restore'
+                ? <RotateCcw size={22} className="text-blue-600" />
+                : <Trash2 size={22} className="text-rose-600" />
+              }
+            </div>
+            <h3 className="text-center text-lg font-black text-slate-900 mb-2">
+              {confirmModal.type === 'restore' ? 'Restore Software?' : 'Clear All History?'}
+            </h3>
+            <p className="text-center text-sm text-slate-500 mb-6">
+              {confirmModal.type === 'restore'
+                ? 'This will reset all page states, forms, and cart to default. Fresh data will be loaded from the server.'
+                : 'This will permanently clear your cart, all form drafts, and browsing history across all pages. Backend records are not deleted.'
+              }
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmModal({ show: false, type: null })}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmModal.type === 'restore' ? handleRestoreSoftware : handleClearHistory}
+                className={`flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition-all ${
+                  confirmModal.type === 'restore'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {confirmModal.type === 'restore' ? 'Yes, Restore' : 'Yes, Clear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Invoice receipt slip modal */}
       {finalInvoice && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -527,9 +655,9 @@ export default function App() {
           </div>
         </div>
 
-        <div className="border-t border-slate-800 pt-4">
+        <div className="border-t border-slate-800 pt-4 space-y-2">
           {user && (
-            <div className="bg-slate-800/40 p-3 rounded-lg flex items-center gap-3 mb-3 border border-slate-800">
+            <div className="bg-slate-800/40 p-3 rounded-lg flex items-center gap-3 mb-1 border border-slate-800">
               <div className="bg-blue-500/20 text-blue-400 p-2 rounded">
                 <UserCheck size={18} />
               </div>
@@ -539,6 +667,26 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* Restore Software */}
+          <button
+            onClick={() => setConfirmModal({ show: true, type: 'restore' })}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/30 text-blue-300 font-bold text-xs uppercase tracking-wider transition-all"
+          >
+            <RotateCcw size={14} />
+            <span>Restore Software</span>
+          </button>
+
+          {/* Clear History */}
+          <button
+            onClick={() => setConfirmModal({ show: true, type: 'clear' })}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-amber-950/40 hover:bg-amber-900/60 border border-amber-900/30 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all"
+          >
+            <Trash2 size={14} />
+            <span>Clear History</span>
+          </button>
+
+          {/* Sign Out */}
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-rose-950/40 hover:bg-rose-900 border border-rose-900/30 text-rose-300 font-bold text-xs uppercase tracking-wider transition-all"
@@ -565,6 +713,7 @@ export default function App() {
         {activeTab === 'billing' && (
           <Billing
             customers={customers}
+            medicines={medicines}
             selectedCustomerId={selectedCustomerId}
             setSelectedCustomerId={setSelectedCustomerId}
             walkInName={walkInName}
@@ -590,6 +739,8 @@ export default function App() {
             handleCheckout={handleCheckout}
             getCustomerStateCode={getCustomerStateCode}
             isLocalCustomer={isLocalCustomer}
+            handleQuickAddCustomer={handleQuickAddCustomer}
+            handleQuickAddMedicine={handleQuickAddMedicine}
           />
         )}
 
