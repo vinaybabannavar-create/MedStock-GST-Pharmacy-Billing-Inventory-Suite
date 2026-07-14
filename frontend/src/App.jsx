@@ -152,15 +152,30 @@ export default function App() {
     }
   };
 
-  // Quick-add medicine directly from billing screen
+  // Quick-add medicine directly from billing/inventory screen
   const handleQuickAddMedicine = async (medData) => {
     try {
-      await api.post(`/medicines/`, medData, getAuthHeaders(token));
+      const res = await api.post(`/medicines/`, medData, getAuthHeaders(token));
       await fetchData(); // refresh medicines list
+      setNewBatch(prev => ({ ...prev, medicine_id: String(res.data.id) }));
       triggerNotification(`Medicine "${medData.name}" added to catalog!`);
       return true;
     } catch (err) {
       triggerNotification(err.response?.data?.detail || 'Failed to add medicine', 'error');
+      return false;
+    }
+  };
+
+  // Quick-add supplier directly from inventory screen
+  const handleQuickAddSupplier = async (supData) => {
+    try {
+      const res = await api.post(`/suppliers/`, supData, getAuthHeaders(token));
+      await fetchData(); // refresh suppliers list
+      setNewBatch(prev => ({ ...prev, supplier_id: String(res.data.id) }));
+      triggerNotification(`Supplier "${res.data.name}" added and selected!`);
+      return true;
+    } catch (err) {
+      triggerNotification(err.response?.data?.detail || 'Failed to add supplier', 'error');
       return false;
     }
   };
@@ -806,10 +821,15 @@ export default function App() {
             medicines={medicines}
             batches={batches}
             suppliers={suppliers}
+            newSupplier={newSupplier}
+            setNewSupplier={setNewSupplier}
+            handleAddSupplier={handleAddSupplier}
             handleDeleteMedicine={handleDeleteMedicine}
             handleDeleteBatch={handleDeleteBatch}
             handleDeleteAllMedicines={handleDeleteAllMedicines}
             handleDeleteAllBatches={handleDeleteAllBatches}
+            handleQuickAddMedicine={handleQuickAddMedicine}
+            handleQuickAddSupplier={handleQuickAddSupplier}
           />
         )}
 

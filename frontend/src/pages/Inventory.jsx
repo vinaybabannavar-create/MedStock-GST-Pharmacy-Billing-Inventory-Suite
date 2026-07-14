@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, X, UserPlus, Pill } from 'lucide-react';
 
 export default function Inventory({
   newMedicine,
@@ -16,9 +16,47 @@ export default function Inventory({
   handleDeleteBatch,
   handleDeleteAllMedicines,
   handleDeleteAllBatches,
+  // Quick-add handlers passed from App.jsx
+  handleQuickAddMedicine,
+  handleQuickAddSupplier,
 }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   // confirmDelete = { type: 'medicine'|'batch'|'all-medicines'|'all-batches', id?: number, label?: string }
+
+  // Quick-add form states
+  const [showQuickMed, setShowQuickMed] = useState(false);
+  const [quickMed, setQuickMed] = useState({
+    name: '', generic_name: '', manufacturer: '', hsn_code: '', gst_rate: '12.00', unit: 'Strip', category: 'Tablet'
+  });
+  const [medLoading, setMedLoading] = useState(false);
+
+  const [showQuickSup, setShowQuickSup] = useState(false);
+  const [quickSup, setQuickSup] = useState({
+    name: '', gstin: '', phone: '', address: '', state_code: '29'
+  });
+  const [supLoading, setSupLoading] = useState(false);
+
+  const submitQuickMed = async (e) => {
+    e.preventDefault();
+    setMedLoading(true);
+    const ok = await handleQuickAddMedicine(quickMed);
+    if (ok) {
+      setQuickMed({ name: '', generic_name: '', manufacturer: '', hsn_code: '', gst_rate: '12.00', unit: 'Strip', category: 'Tablet' });
+      setShowQuickMed(false);
+    }
+    setMedLoading(false);
+  };
+
+  const submitQuickSup = async (e) => {
+    e.preventDefault();
+    setSupLoading(true);
+    const ok = await handleQuickAddSupplier(quickSup);
+    if (ok) {
+      setQuickSup({ name: '', gstin: '', phone: '', address: '', state_code: '29' });
+      setShowQuickSup(false);
+    }
+    setSupLoading(false);
+  };
 
   const doDelete = () => {
     if (!confirmDelete) return;
@@ -189,18 +227,97 @@ export default function Inventory({
             
             <form onSubmit={handleAddBatch} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Select Medicine</label>
-                <select
-                  value={newBatch.medicine_id}
-                  onChange={e => setNewBatch({...newBatch, medicine_id: e.target.value})}
-                  required
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                >
-                  <option value="">-- Choose Medicine --</option>
-                  {medicines.map(med => (
-                    <option key={med.id} value={med.id}>{med.name} ({med.manufacturer})</option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-500">Select Medicine</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickMed(!showQuickMed)}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-0.5"
+                  >
+                    {showQuickMed ? <X size={12} /> : <Plus size={12} />}
+                    {showQuickMed ? 'Cancel Add' : 'Add New'}
+                  </button>
+                </div>
+
+                {showQuickMed ? (
+                  <div className="mb-3 p-3 bg-blue-50/60 border border-blue-100 rounded-lg space-y-2.5">
+                    <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Quick Add Medicine</p>
+                    <div>
+                      <input
+                        type="text" required placeholder="Medicine Name *"
+                        value={quickMed.name}
+                        onChange={e => setQuickMed({...quickMed, name: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text" placeholder="Generic Name"
+                        value={quickMed.generic_name}
+                        onChange={e => setQuickMed({...quickMed, generic_name: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs"
+                      />
+                      <input
+                        type="text" required placeholder="HSN Code *"
+                        value={quickMed.hsn_code}
+                        onChange={e => setQuickMed({...quickMed, hsn_code: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs font-mono"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={quickMed.gst_rate}
+                        onChange={e => setQuickMed({...quickMed, gst_rate: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs"
+                      >
+                        <option value="0.00">0%</option>
+                        <option value="5.00">5%</option>
+                        <option value="12.00">12%</option>
+                        <option value="18.00">18%</option>
+                      </select>
+                      <input
+                        type="text" required placeholder="Unit (e.g. Strip)"
+                        value={quickMed.unit}
+                        onChange={e => setQuickMed({...quickMed, unit: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text" required placeholder="Category (e.g. Tablet)"
+                        value={quickMed.category}
+                        onChange={e => setQuickMed({...quickMed, category: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs"
+                      />
+                      <input
+                        type="text" required placeholder="Manufacturer"
+                        value={quickMed.manufacturer}
+                        onChange={e => setQuickMed({...quickMed, manufacturer: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={medLoading}
+                      onClick={submitQuickMed}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded text-xs transition-all"
+                    >
+                      {medLoading ? 'Saving...' : 'Save & Select Medicine'}
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={newBatch.medicine_id}
+                    onChange={e => setNewBatch({...newBatch, medicine_id: e.target.value})}
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="">-- Choose Medicine --</option>
+                    {medicines.map(med => (
+                      <option key={med.id} value={med.id}>{med.name} ({med.manufacturer})</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -262,18 +379,80 @@ export default function Inventory({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Select Supplier</label>
-                <select
-                  value={newBatch.supplier_id}
-                  onChange={e => setNewBatch({...newBatch, supplier_id: e.target.value})}
-                  required
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                >
-                  <option value="">-- Choose Supplier --</option>
-                  {suppliers.map(sup => (
-                    <option key={sup.id} value={sup.id}>{sup.name}</option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-500">Select Supplier</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickSup(!showQuickSup)}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-0.5"
+                  >
+                    {showQuickSup ? <X size={12} /> : <Plus size={12} />}
+                    {showQuickSup ? 'Cancel Add' : 'Add New'}
+                  </button>
+                </div>
+
+                {showQuickSup ? (
+                  <div className="mb-3 p-3 bg-indigo-50/60 border border-indigo-100 rounded-lg space-y-2.5">
+                    <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">Quick Add Supplier</p>
+                    <div>
+                      <input
+                        type="text" required placeholder="Supplier Name *"
+                        value={quickSup.name}
+                        onChange={e => setQuickSup({...quickSup, name: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text" required placeholder="GSTIN *"
+                        value={quickSup.gstin}
+                        onChange={e => setQuickSup({...quickSup, gstin: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs font-mono"
+                      />
+                      <input
+                        type="text" required placeholder="Phone *"
+                        value={quickSup.phone}
+                        onChange={e => setQuickSup({...quickSup, phone: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text" required placeholder="State Code (e.g. 29)"
+                        value={quickSup.state_code}
+                        onChange={e => setQuickSup({...quickSup, state_code: e.target.value})}
+                        maxLength="2"
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs font-mono"
+                      />
+                      <input
+                        type="text" required placeholder="Address"
+                        value={quickSup.address}
+                        onChange={e => setQuickSup({...quickSup, address: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={supLoading}
+                      onClick={submitQuickSup}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 rounded text-xs transition-all"
+                    >
+                      {supLoading ? 'Saving...' : 'Save & Select Supplier'}
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={newBatch.supplier_id}
+                    onChange={e => setNewBatch({...newBatch, supplier_id: e.target.value})}
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="">-- Choose Supplier --</option>
+                    {suppliers.map(sup => (
+                      <option key={sup.id} value={sup.id}>{sup.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <button
