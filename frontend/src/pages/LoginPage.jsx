@@ -61,6 +61,9 @@ export default function LoginPage({
           >
             {loginLoading ? 'Entering System...' : 'Enter System / Register'}
           </button>
+          <p className="text-center text-xs text-slate-500 mt-2">
+            First time? Enter any Email ID + Name to auto-register as admin.
+          </p>
         </form>
       </div>
     </div>
