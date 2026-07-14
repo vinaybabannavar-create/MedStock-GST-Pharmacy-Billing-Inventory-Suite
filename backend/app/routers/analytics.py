@@ -5,7 +5,7 @@ GET /analytics/alerts — Returns structured alerts for:
   3. Batches with critically low stock (<=10 units)
 """
 from datetime import date, timedelta
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import auth, models
 from app.db import get_db
@@ -122,3 +122,34 @@ def get_sales_summary(
         "this_month": {"invoices": count_month, "revenue": float(total_month)},
         "all_time": {"invoices": count_all, "revenue": float(total_all)}
     }
+
+
+@router.post("/clear-all", status_code=200)
+def clear_all_data(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.RoleChecker(["admin"]))
+):
+    """
+    DANGER: Deletes ALL operational data in correct FK order.
+    Keeps user accounts intact. Admin only.
+    Tables cleared: stock_ledger, sale_items, sales, purchase_items, purchases, batches, medicines, customers, suppliers
+    """
+    try:
+        # Delete in reverse-dependency order to satisfy FK constraints
+        db.query(models.StockLedger).delete()
+        db.query(models.SaleItem).delete()
+        db.query(models.Sale).delete()
+        db.query(models.PurchaseItem).delete()
+        db.query(models.Purchase).delete()
+        db.query(models.Batch).delete()
+        db.query(models.Medicine).delete()
+        db.query(models.Customer).delete()
+        db.query(models.Supplier).delete()
+        db.commit()
+        return {"status": "ok", "message": "All data cleared successfully. User accounts are preserved."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to clear data: {str(e)[:200]}"
+        )

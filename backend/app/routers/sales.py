@@ -160,9 +160,10 @@ def create_sale(
             db.add(db_ledger)
 
         # Apply discount
-        grand_total = (total_subtotal + total_cgst + total_sgst + total_igst - sale_data.discount).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
+        grand_total = max(
+            Decimal("0.00"),
+            (total_subtotal + total_cgst + total_sgst + total_igst - sale_data.discount)
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         # Patch sale with computed totals
         db_sale.subtotal     = total_subtotal

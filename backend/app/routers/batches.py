@@ -140,3 +140,23 @@ def adjust_batch_quantity(
     db.refresh(db_batch)
     return db_batch
 
+
+@router.delete("/{batch_id}", status_code=204)
+def delete_batch(
+    batch_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.RoleChecker(["admin"]))
+):
+    """Delete a batch record. Admin only. Fails if the batch is referenced by sale_items."""
+    db_batch = db.query(models.Batch).filter(models.Batch.id == batch_id).first()
+    if not db_batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    try:
+        db.delete(db_batch)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete batch: it may be referenced by existing sales or purchase records. ({str(e)[:120]})"
+        )

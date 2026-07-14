@@ -108,10 +108,16 @@ export default function App() {
     triggerNotification('Software restored to default state!');
   };
 
-  // Clear History: wipe all transactional UI state across all pages
-  const handleClearHistory = () => {
+  // Clear History: wipe ALL data from the backend database + reset UI
+  const handleClearHistory = async () => {
     setConfirmModal({ show: false, type: null });
-    // Clear billing cart and invoice history
+    try {
+      await api.post(`/analytics/clear-all`, {}, getAuthHeaders(token));
+      triggerNotification('All data cleared from the database!');
+    } catch (err) {
+      triggerNotification(err.response?.data?.detail || 'Failed to clear backend data', 'error');
+    }
+    // Reset all UI state
     setCart([]);
     setFinalInvoice(null);
     setDiscount('0.00');
@@ -121,20 +127,14 @@ export default function App() {
     setWalkInName('Walk-in Customer');
     setWalkInPhone('9999999999');
     setWalkInStateCode('29');
-    // Clear all form drafts
     setNewMedicine({ name: '', generic_name: '', manufacturer: '', hsn_code: '', gst_rate: '18.00', unit: 'Strip', category: 'Tablet' });
     setNewSupplier({ name: '', gstin: '', phone: '', address: '', state_code: '29' });
     setNewCustomer({ name: '', phone: '', address: '', state_code: '29' });
     setNewBatch({ medicine_id: '', batch_no: '', expiry_date: '', quantity: 100, purchase_price: '50.00', mrp: '99.00', supplier_id: '' });
-    // Clear any locally stored session tokens and browsing state
+    setSales([]); setAlerts(null); setSalesSummary(null);
+    setMedicines([]); setBatches([]); setSuppliers([]); setCustomers([]);
     localStorage.removeItem('activeTab');
-    // Refresh summary data
-    setSales([]);
-    setAlerts(null);
-    setSalesSummary(null);
-    // Re-fetch fresh analytics
-    fetchData();
-    triggerNotification('All history cleared successfully!');
+    setActiveTab('dashboard');
   };
 
   // Quick-add customer directly from billing screen
@@ -162,6 +162,57 @@ export default function App() {
     } catch (err) {
       triggerNotification(err.response?.data?.detail || 'Failed to add medicine', 'error');
       return false;
+    }
+  };
+
+  // ── Per-row delete handlers ──
+  const handleDeleteMedicine = async (id) => {
+    try {
+      await api.delete(`/medicines/${id}`, getAuthHeaders(token));
+      triggerNotification('Medicine deleted successfully');
+      fetchData();
+    } catch (err) {
+      triggerNotification(err.response?.data?.detail || 'Cannot delete: medicine may have linked batches or sales', 'error');
+    }
+  };
+
+  const handleDeleteBatch = async (id) => {
+    try {
+      await api.delete(`/batches/${id}`, getAuthHeaders(token));
+      triggerNotification('Batch deleted successfully');
+      fetchData();
+    } catch (err) {
+      triggerNotification(err.response?.data?.detail || 'Cannot delete: batch may be referenced by existing sales', 'error');
+    }
+  };
+
+  const handleDeleteAllMedicines = async () => {
+    try {
+      // Delete all batches first (FK dependency), then medicines
+      for (const b of batches) {
+        await api.delete(`/batches/${b.id}`, getAuthHeaders(token));
+      }
+      for (const m of medicines) {
+        await api.delete(`/medicines/${m.id}`, getAuthHeaders(token));
+      }
+      triggerNotification('All medicines and batches deleted');
+      fetchData();
+    } catch (err) {
+      triggerNotification(err.response?.data?.detail || 'Some items could not be deleted (may be referenced by sales)', 'error');
+      fetchData();
+    }
+  };
+
+  const handleDeleteAllBatches = async () => {
+    try {
+      for (const b of batches) {
+        await api.delete(`/batches/${b.id}`, getAuthHeaders(token));
+      }
+      triggerNotification('All batches deleted');
+      fetchData();
+    } catch (err) {
+      triggerNotification(err.response?.data?.detail || 'Some batches could not be deleted', 'error');
+      fetchData();
     }
   };
 
@@ -755,6 +806,10 @@ export default function App() {
             medicines={medicines}
             batches={batches}
             suppliers={suppliers}
+            handleDeleteMedicine={handleDeleteMedicine}
+            handleDeleteBatch={handleDeleteBatch}
+            handleDeleteAllMedicines={handleDeleteAllMedicines}
+            handleDeleteAllBatches={handleDeleteAllBatches}
           />
         )}
 
