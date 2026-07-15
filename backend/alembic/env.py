@@ -12,6 +12,11 @@ from app.config import settings
 from app.db import Base
 import app.models  # Required to ensure models are registered on Base.metadata
 
+def _fix_db_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    return url
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -36,7 +41,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = settings.DATABASE_URL
+    url = _fix_db_url(settings.DATABASE_URL)
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -56,7 +61,7 @@ def run_migrations_online() -> None:
 
     """
     connectable = create_engine(
-        settings.DATABASE_URL,
+        _fix_db_url(settings.DATABASE_URL),
         poolclass=pool.NullPool,
     )
 
