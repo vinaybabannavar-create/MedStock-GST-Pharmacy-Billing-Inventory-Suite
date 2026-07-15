@@ -18,7 +18,8 @@ import {
   Printer,
   X,
   RotateCcw,
-  Trash2
+  Trash2,
+  Menu
 } from 'lucide-react';
 
 // Import refactored page components
@@ -33,6 +34,7 @@ export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Login form states
   const [username, setUsername] = useState('');
@@ -546,33 +548,53 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden relative font-sans">
+      {/* Mobile Header */}
+      <div className="md:hidden bg-slate-950 border-b border-slate-900 flex items-center justify-between p-4 z-30 shadow-md">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="text-white hover:text-indigo-400 focus:outline-none transition-colors"
+          >
+            <Menu size={24} />
+          </button>
+          <div>
+            <h1 className="text-xl font-black text-white tracking-wider">Medi<span className="text-indigo-400">Ledger</span></h1>
+          </div>
+        </div>
+        {user && (
+          <div className="bg-indigo-500/20 text-indigo-400 p-1.5 rounded-lg">
+            <UserCheck size={18} />
+          </div>
+        )}
+      </div>
+
       {/* Toast Notification */}
       {notification.show && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 py-3 px-5 rounded-lg border shadow-xl text-white transition-all transform translate-y-0 ${
-          notification.type === 'error' ? 'bg-rose-600 border-rose-500' : 'bg-emerald-600 border-emerald-500'
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 py-3.5 px-6 rounded-2xl shadow-2xl border text-white backdrop-blur-md transition-all duration-300 transform translate-y-0 ${
+          notification.type === 'error' ? 'bg-rose-600/95 border-rose-500/50' : 'bg-emerald-600/95 border-emerald-500/50'
         }`}>
-          <CheckCircle size={18} />
-          <span className="text-sm font-semibold">{notification.message}</span>
+          <CheckCircle size={20} className="shrink-0" />
+          <span className="text-sm font-bold tracking-tight">{notification.message}</span>
         </div>
       )}
 
       {/* Confirmation Modal */}
       {confirmModal.show && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
-              confirmModal.type === 'restore' ? 'bg-blue-100' : 'bg-rose-100'
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 border border-slate-100 transform scale-100 transition-all duration-300">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 ${
+              confirmModal.type === 'restore' ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'
             }`}>
               {confirmModal.type === 'restore'
-                ? <RotateCcw size={22} className="text-blue-600" />
-                : <Trash2 size={22} className="text-rose-600" />
+                ? <RotateCcw size={24} className="animate-spin" style={{ animationDuration: '3s' }} />
+                : <Trash2 size={24} />
               }
             </div>
-            <h3 className="text-center text-lg font-black text-slate-900 mb-2">
+            <h3 className="text-center text-xl font-extrabold text-slate-900 mb-2">
               {confirmModal.type === 'restore' ? 'Restore Software?' : 'Clear All History?'}
             </h3>
-            <p className="text-center text-sm text-slate-500 mb-6">
+            <p className="text-center text-sm text-slate-500 mb-6 leading-relaxed">
               {confirmModal.type === 'restore'
                 ? 'This will reset all page states, forms, and cart to default. Fresh data will be loaded from the server.'
                 : 'This will permanently clear your cart, all form drafts, and browsing history across all pages. Backend records are not deleted.'
@@ -707,15 +729,23 @@ export default function App() {
         </div>
       )}
 
+      {/* Mobile Sidebar Backdrop */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        ></div>
+      )}
+
       {/* SIDEBAR NAVIGATION */}
-      <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-4 shrink-0">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-950 border-r border-slate-900 flex flex-col justify-between p-5 shrink-0 transform transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div>
-          <div className="py-4 border-b border-slate-800 text-center mb-6">
-            <h1 className="text-2xl font-black text-white tracking-wider">MediLedger</h1>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Karnataka Store Suite</p>
+          <div className="py-4 border-b border-slate-900 text-center mb-6">
+            <h1 className="text-2xl font-black text-white tracking-widest">Medi<span className="text-indigo-400">Ledger</span></h1>
+            <p className="text-[9px] text-indigo-400 font-extrabold uppercase tracking-widest mt-1">Karnataka Store Suite</p>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {[
               { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
               { id: 'billing', name: 'Billing Counter', icon: ShoppingCart },
@@ -729,10 +759,10 @@ export default function App() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 py-3 px-4 rounded-lg font-semibold text-sm transition-all ${
+                  className={`w-full flex items-center gap-3 py-3 px-4 rounded-xl font-bold text-sm transition-all smooth-hover cursor-pointer ${
                     isSelected 
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/10' 
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      ? 'bg-gradient-to-r from-indigo-600/90 to-violet-600/90 text-white shadow-xl shadow-indigo-600/10 border-l-4 border-indigo-400' 
+                      : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100'
                   }`}
                 >
                   <Icon size={18} />
@@ -743,15 +773,15 @@ export default function App() {
           </div>
         </div>
 
-        <div className="border-t border-slate-800 pt-4 space-y-2">
+        <div className="border-t border-slate-900 pt-4 space-y-2.5">
           {user && (
-            <div className="bg-slate-800/40 p-3 rounded-lg flex items-center gap-3 mb-1 border border-slate-800">
-              <div className="bg-blue-500/20 text-blue-400 p-2 rounded">
+            <div className="bg-slate-900/60 p-3.5 rounded-2xl flex items-center gap-3 mb-1 border border-slate-900">
+              <div className="bg-indigo-500/20 text-indigo-400 p-2 rounded-xl">
                 <UserCheck size={18} />
               </div>
               <div className="overflow-hidden">
-                <h4 className="text-xs font-bold text-white truncate">{user.name}</h4>
-                <p className="text-[10px] text-slate-400 capitalize font-mono">{user.role}</p>
+                <h4 className="text-xs font-black text-white truncate">{user.name}</h4>
+                <p className="text-[9px] text-slate-400 capitalize font-mono tracking-wider">{user.role}</p>
               </div>
             </div>
           )}
@@ -759,7 +789,7 @@ export default function App() {
           {/* Restore Software */}
           <button
             onClick={() => setConfirmModal({ show: true, type: 'restore' })}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/30 text-blue-300 font-bold text-xs uppercase tracking-wider transition-all"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-900/30 text-indigo-300 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
           >
             <RotateCcw size={14} />
             <span>Restore Software</span>
@@ -768,7 +798,7 @@ export default function App() {
           {/* Clear History */}
           <button
             onClick={() => setConfirmModal({ show: true, type: 'clear' })}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-amber-950/40 hover:bg-amber-900/60 border border-amber-900/30 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/30 text-rose-300 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
           >
             <Trash2 size={14} />
             <span>Clear History</span>
@@ -777,7 +807,7 @@ export default function App() {
           {/* Sign Out */}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-rose-950/40 hover:bg-rose-900 border border-rose-900/30 text-rose-300 font-bold text-xs uppercase tracking-wider transition-all"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
           >
             <LogOut size={14} />
             <span>Sign Out</span>
@@ -786,7 +816,7 @@ export default function App() {
       </aside>
 
       {/* MAIN CONTAINER */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full h-[calc(100vh-68px)] md:h-screen">
         {activeTab === 'dashboard' && (
           <Dashboard
             salesSummary={salesSummary}
