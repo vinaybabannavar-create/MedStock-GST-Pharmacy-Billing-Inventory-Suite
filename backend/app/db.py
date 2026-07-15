@@ -2,8 +2,14 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.config import settings
 
+# Render provides DATABASE_URL as postgres://... but psycopg3 needs postgresql+psycopg://
+def _fix_db_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    return url
+
 # Create engine
-engine = create_engine(settings.DATABASE_URL)
+engine = create_engine(_fix_db_url(settings.DATABASE_URL))
 
 # Session maker
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
