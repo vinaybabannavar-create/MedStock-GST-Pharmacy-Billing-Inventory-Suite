@@ -421,7 +421,7 @@ export default function Inventory({
                         type="text" required placeholder="State Code (e.g. 29)"
                         value={quickSup.state_code}
                         onChange={e => setQuickSup({...quickSup, state_code: e.target.value})}
-                        maxLength="2"
+                        maxLength="3"
                         className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs font-mono"
                       />
                       <input

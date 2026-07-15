@@ -81,10 +81,10 @@ class CustomerResponse(CustomerBase):
 
 class SupplierBase(BaseModel):
     name: str = Field(..., min_length=1)
-    gstin: str = Field(..., min_length=15, max_length=15, description="15-character GSTIN")
-    phone: str = Field(..., min_length=10, max_length=15)
+    gstin: str = Field(..., min_length=1, max_length=20, description="GSTIN (up to 20 characters)")
+    phone: str = Field(..., min_length=7, max_length=15)
     address: str = Field(..., min_length=1)
-    state_code: str = Field(..., min_length=2, max_length=2, description="2-digit State code")
+    state_code: str = Field(..., min_length=1, max_length=3, description="State code")
 
 class SupplierCreate(SupplierBase):
     pass

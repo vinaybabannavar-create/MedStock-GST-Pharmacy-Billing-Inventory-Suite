@@ -43,8 +43,8 @@ export default function Suppliers({
                   value={newSupplier.gstin} 
                   onChange={e => setNewSupplier({...newSupplier, gstin: e.target.value.toUpperCase()})}
                   required
-                  maxLength="15"
-                  placeholder="29AAAAA1111A1Z1"
+                  maxLength="20"
+                  placeholder="e.g. 29AAAAA1234A1Z1"
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
                 />
               </div>
@@ -55,7 +55,7 @@ export default function Suppliers({
                   value={newSupplier.state_code} 
                   onChange={e => setNewSupplier({...newSupplier, state_code: e.target.value})}
                   required
-                  maxLength="2"
+                  maxLength="3"
                   placeholder="29"
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
                 />

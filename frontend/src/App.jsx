@@ -78,8 +78,21 @@ export default function App() {
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [confirmModal, setConfirmModal] = useState({ show: false, type: null });
 
+  // Helper: safely extract a readable string from backend error responses
+  const getErrMsg = (detail, fallback) => {
+    if (!detail) return fallback;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      // Pydantic validation errors: [{loc, msg, type}, ...]
+      return detail.map(d => d.msg || JSON.stringify(d)).join('; ');
+    }
+    return String(detail);
+  };
+
   const triggerNotification = (message, type = 'success') => {
-    setNotification({ show: true, message, type });
+    // Always ensure message is a string to prevent React render crash
+    const safeMsg = typeof message === 'string' ? message : getErrMsg(message, 'Unknown error');
+    setNotification({ show: true, message: safeMsg, type });
     setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 3000);
   };
 
@@ -115,7 +128,7 @@ export default function App() {
       await api.post(`/analytics/clear-all`, {}, getAuthHeaders(token));
       triggerNotification('All data cleared from the database!');
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Failed to clear backend data', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Failed to clear backend data'), 'error');
     }
     // Reset all UI state
     setCart([]);
@@ -147,7 +160,7 @@ export default function App() {
       triggerNotification(`Customer "${res.data.name}" added and selected!`);
       return true;
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Failed to add customer', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Failed to add customer'), 'error');
       return false;
     }
   };
@@ -161,7 +174,7 @@ export default function App() {
       triggerNotification(`Medicine "${medData.name}" added to catalog!`);
       return true;
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Failed to add medicine', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Failed to add medicine'), 'error');
       return false;
     }
   };
@@ -175,7 +188,7 @@ export default function App() {
       triggerNotification(`Supplier "${res.data.name}" added and selected!`);
       return true;
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Failed to add supplier', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Failed to add supplier'), 'error');
       return false;
     }
   };
@@ -187,7 +200,7 @@ export default function App() {
       triggerNotification('Medicine deleted successfully');
       fetchData();
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Cannot delete: medicine may have linked batches or sales', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Cannot delete: medicine may have linked batches or sales'), 'error');
     }
   };
 
@@ -197,7 +210,7 @@ export default function App() {
       triggerNotification('Batch deleted successfully');
       fetchData();
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Cannot delete: batch may be referenced by existing sales', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Cannot delete: batch may be referenced by existing sales'), 'error');
     }
   };
 
@@ -213,7 +226,7 @@ export default function App() {
       triggerNotification('All medicines and batches deleted');
       fetchData();
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Some items could not be deleted (may be referenced by sales)', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Some items could not be deleted (may be referenced by sales)'), 'error');
       fetchData();
     }
   };
@@ -226,7 +239,7 @@ export default function App() {
       triggerNotification('All batches deleted');
       fetchData();
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Some batches could not be deleted', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Some batches could not be deleted'), 'error');
       fetchData();
     }
   };
@@ -271,7 +284,7 @@ export default function App() {
       setToken(res.data.access_token);
       triggerNotification('Successfully logged in!');
     } catch (err) {
-      setLoginError(err.response?.data?.detail || 'Failed to connect to backend server');
+      setLoginError(getErrMsg(err.response?.data?.detail, 'Failed to connect to backend server'));
     } finally {
       setLoginLoading(false);
     }
@@ -348,6 +361,15 @@ export default function App() {
     updated.splice(index, 1);
     setCart(updated);
     triggerNotification('Item removed from cart');
+  };
+
+  // Selecting a different customer clears the cart so items don't carry over
+  const handleSelectCustomer = (customerId) => {
+    if (customerId !== selectedCustomerId) {
+      setCart([]);
+      setDiscount('0.00');
+    }
+    setSelectedCustomerId(customerId);
   };
 
   // GST State Calculation logic
@@ -430,7 +452,7 @@ export default function App() {
       setDiscount('0.00');
       fetchData();
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Failed to complete checkout', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Failed to complete checkout'), 'error');
     }
   };
 
@@ -464,7 +486,7 @@ export default function App() {
       setNewMedicine({ name: '', generic_name: '', manufacturer: '', hsn_code: '', gst_rate: '18.00', unit: 'Strip', category: 'Tablet' });
       fetchData();
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Failed to add medicine', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Failed to add medicine'), 'error');
     }
   };
 
@@ -476,7 +498,7 @@ export default function App() {
       setNewSupplier({ name: '', gstin: '', phone: '', address: '', state_code: '29' });
       fetchData();
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Failed to add supplier', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Failed to add supplier'), 'error');
     }
   };
 
@@ -488,7 +510,7 @@ export default function App() {
       setNewCustomer({ name: '', phone: '', address: '', state_code: '29' });
       fetchData();
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Failed to add customer', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Failed to add customer'), 'error');
     }
   };
 
@@ -500,7 +522,7 @@ export default function App() {
       setNewBatch({ medicine_id: '', batch_no: '', expiry_date: '', quantity: 100, purchase_price: '50.00', mrp: '99.00', supplier_id: '' });
       fetchData();
     } catch (err) {
-      triggerNotification(err.response?.data?.detail || 'Failed to add batch', 'error');
+      triggerNotification(getErrMsg(err.response?.data?.detail, 'Failed to add batch'), 'error');
     }
   };
 
@@ -781,7 +803,7 @@ export default function App() {
             customers={customers}
             medicines={medicines}
             selectedCustomerId={selectedCustomerId}
-            setSelectedCustomerId={setSelectedCustomerId}
+            setSelectedCustomerId={handleSelectCustomer}
             walkInName={walkInName}
             setWalkInName={setWalkInName}
             walkInPhone={walkInPhone}
