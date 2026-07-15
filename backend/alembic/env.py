@@ -14,7 +14,9 @@ import app.models  # Required to ensure models are registered on Base.metadata
 
 def _fix_db_url(url: str) -> str:
     if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg://", 1)
+        url = url.replace("postgres://", "postgresql://", 1)
+    if url.startswith("postgresql+psycopg://"):
+        url = url.replace("postgresql+psycopg://", "postgresql://", 1)
     return url
 
 # this is the Alembic Config object, which provides

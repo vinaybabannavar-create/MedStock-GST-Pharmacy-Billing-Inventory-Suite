@@ -2,10 +2,14 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.config import settings
 
-# Render provides DATABASE_URL as postgres://... but psycopg3 needs postgresql+psycopg://
+# Normalize DATABASE_URL:
+#  - Render gives postgres://  → convert to postgresql://  (psycopg2)
+#  - Local may use postgresql+psycopg:// (psycopg3) → convert to postgresql://
 def _fix_db_url(url: str) -> str:
     if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg://", 1)
+        url = url.replace("postgres://", "postgresql://", 1)
+    if url.startswith("postgresql+psycopg://"):
+        url = url.replace("postgresql+psycopg://", "postgresql://", 1)
     return url
 
 # Create engine
