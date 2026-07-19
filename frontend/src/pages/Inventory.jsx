@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, AlertTriangle, X, UserPlus, Pill, Calendar, Truck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, AlertTriangle, X, UserPlus, Pill, Calendar, Truck, Search } from 'lucide-react';
 
 export default function Inventory({
   newMedicine,
@@ -22,6 +22,48 @@ export default function Inventory({
 }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   // confirmDelete = { type: 'medicine'|'batch'|'all-medicines'|'all-batches', id?: number, label?: string }
+
+  const [batchMedQuery, setBatchMedQuery] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (!newBatch.medicine_id) {
+      setBatchMedQuery('');
+    }
+  }, [newBatch.medicine_id]);
+
+  const filteredBatchMeds = (() => {
+    const q = batchMedQuery.trim().toLowerCase();
+    if (!q) return [];
+
+    const startsWithName = [];
+    const containsName = [];
+    const startsWithGeneric = [];
+    const containsGeneric = [];
+
+    medicines.forEach(m => {
+      const name = m.name.toLowerCase();
+      const generic = m.generic_name ? m.generic_name.toLowerCase() : '';
+
+      if (name.startsWith(q)) {
+        startsWithName.push(m);
+      } else if (name.includes(q)) {
+        containsName.push(m);
+      } else if (generic.startsWith(q)) {
+        startsWithGeneric.push(m);
+      } else if (generic.includes(q)) {
+        containsGeneric.push(m);
+      }
+    });
+
+    const sortByName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    startsWithName.sort(sortByName);
+    containsName.sort(sortByName);
+    startsWithGeneric.sort(sortByName);
+    containsGeneric.sort(sortByName);
+
+    return [...startsWithName, ...containsName, ...startsWithGeneric, ...containsGeneric];
+  })();
 
   // Quick-add form states
   const [showQuickMed, setShowQuickMed] = useState(false);
@@ -66,6 +108,8 @@ export default function Inventory({
     else if (confirmDelete.type === 'all-batches') handleDeleteAllBatches();
     setConfirmDelete(null);
   };
+
+  const selectedMed = medicines.find(m => String(m.id) === String(newBatch.medicine_id));
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -306,17 +350,93 @@ export default function Inventory({
                     </button>
                   </div>
                 ) : (
-                  <select
-                    value={newBatch.medicine_id}
-                    onChange={e => setNewBatch({...newBatch, medicine_id: e.target.value})}
-                    required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none"
-                  >
-                    <option value="">-- Choose Medicine --</option>
-                    {medicines.map(med => (
-                      <option key={med.id} value={med.id}>{med.name} ({med.manufacturer})</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    {selectedMed ? (
+                      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                        <div className="flex-1 text-sm font-semibold text-slate-800">
+                          {selectedMed.name} <span className="text-xs text-slate-400 font-normal">({selectedMed.manufacturer})</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewBatch({...newBatch, medicine_id: ''});
+                            setBatchMedQuery('');
+                          }}
+                          className="text-xs font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 py-1 px-2.5 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                        >
+                          <X size={12} />
+                          <span>Change</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="relative z-20">
+                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                            <Search size={14} />
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="Type to search medicine..."
+                            value={batchMedQuery}
+                            onChange={e => {
+                              setBatchMedQuery(e.target.value);
+                              setDropdownOpen(true);
+                            }}
+                            onFocus={() => setDropdownOpen(true)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        {dropdownOpen && (
+                          <>
+                            {/* Backdrop to close dropdown on click outside */}
+                            <div 
+                              className="fixed inset-0 z-10" 
+                              onClick={() => setDropdownOpen(false)}
+                            />
+                            
+                            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
+                              {batchMedQuery.trim() === '' ? (
+                                <div className="p-3 text-xs text-slate-400 text-center italic">
+                                  Type to search medicines...
+                                </div>
+                              ) : filteredBatchMeds.length === 0 ? (
+                                <div className="p-3 text-xs text-slate-400 text-center">
+                                  No matching medicines found.
+                                </div>
+                              ) : (
+                                filteredBatchMeds.map(med => (
+                                  <div
+                                    key={med.id}
+                                    onClick={() => {
+                                      setNewBatch({...newBatch, medicine_id: String(med.id)});
+                                      setDropdownOpen(false);
+                                    }}
+                                    className="p-3 text-sm cursor-pointer hover:bg-slate-50 transition-colors flex flex-col"
+                                  >
+                                    <span className="font-bold text-slate-800">{med.name}</span>
+                                    <span className="text-[10px] text-slate-400">
+                                      {med.generic_name && <span className="mr-2 text-slate-500 font-semibold">{med.generic_name}</span>}
+                                      Manufacturer: {med.manufacturer}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                    {/* HTML5 validation helper to ensure a medicine is actually selected */}
+                    <input
+                      type="text"
+                      value={newBatch.medicine_id}
+                      onChange={() => {}}
+                      required
+                      className="absolute opacity-0 pointer-events-none"
+                      style={{ width: 1, height: 1, bottom: 0 }}
+                    />
+                  </div>
                 )}
               </div>
 

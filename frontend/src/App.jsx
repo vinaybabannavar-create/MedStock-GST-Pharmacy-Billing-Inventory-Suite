@@ -528,10 +528,38 @@ export default function App() {
     }
   };
 
-  const filteredMedicines = medicines.filter(m => 
-    m.name.toLowerCase().includes(medSearchQuery.toLowerCase()) ||
-    (m.generic_name && m.generic_name.toLowerCase().includes(medSearchQuery.toLowerCase()))
-  );
+  const filteredMedicines = (() => {
+    const q = medSearchQuery.trim().toLowerCase();
+    if (!q) return [];
+
+    const startsWithName = [];
+    const containsName = [];
+    const startsWithGeneric = [];
+    const containsGeneric = [];
+
+    medicines.forEach(m => {
+      const name = m.name.toLowerCase();
+      const generic = m.generic_name ? m.generic_name.toLowerCase() : '';
+
+      if (name.startsWith(q)) {
+        startsWithName.push(m);
+      } else if (name.includes(q)) {
+        containsName.push(m);
+      } else if (generic.startsWith(q)) {
+        startsWithGeneric.push(m);
+      } else if (generic.includes(q)) {
+        containsGeneric.push(m);
+      }
+    });
+
+    const sortByName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    startsWithName.sort(sortByName);
+    containsName.sort(sortByName);
+    startsWithGeneric.sort(sortByName);
+    containsGeneric.sort(sortByName);
+
+    return [...startsWithName, ...containsName, ...startsWithGeneric, ...containsGeneric];
+  })();
 
   if (!token) {
     return (

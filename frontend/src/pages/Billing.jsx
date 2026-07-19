@@ -356,7 +356,11 @@ export default function Billing({
                       </button>
                     </div>
                   ))}
-                  {filteredMedicines.length === 0 && (
+                  {medSearchQuery.trim() === '' ? (
+                    <div className="py-8 text-center text-slate-400">
+                      <p className="text-xs italic">Type to search medicines...</p>
+                    </div>
+                  ) : filteredMedicines.length === 0 ? (
                     <div className="py-8 text-center">
                       <p className="text-xs text-slate-400">No matching medicines found.</p>
                       <button
@@ -367,7 +371,7 @@ export default function Billing({
                         + Add this medicine to catalog
                       </button>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </>
             )}
